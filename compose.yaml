@@ -1,0 +1,50 @@
+services:
+  mongodb:
+    image: mongo:8
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secreto
+    volumes:
+      - datos-mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 10
+
+  reportes:
+    build: ./reportes
+    ports:
+      - "4000:4000"
+    environment:
+      CURSOS_URL: http://cursos:3000
+      ESTUDIANTES_URL: http://estudiantes:5000
+    depends_on:
+      - cursos
+      - estudiantes
+
+  cursos:
+    build: ./cursos
+    ports:
+      - "3000:3000"
+    environment:
+      MONGO_URL: mongodb://admin:secreto@mongodb:27017/academia?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./cursos
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./cursos/package.json
+
+  estudiantes:
+    build: ./estudiantes
+    ports:
+      - "5000:5000"
+
+volumes:
+  datos-mongo:
